@@ -1,4 +1,4 @@
-const ProofGenerator = require("./src/ProofGenerator");
+const ProofGenerator = require("../src/ProofGenerator");
 const fs = require("fs");
 const path = require("path");
 
