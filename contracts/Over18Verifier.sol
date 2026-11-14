@@ -3,8 +3,10 @@ pragma solidity ^0.8.19;
 
 import "./AttesterContract.sol";
 import "./Groth16Verifier.sol";
+import "./RoleRegistry.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Over18Verifier {
+contract Over18Verifier is Ownable {
     
     struct VerificationRequest {
         address requester;
@@ -17,6 +19,7 @@ contract Over18Verifier {
     
     AttesterContract public immutable attesterContract;
     Groth16Verifier public immutable groth16Verifier;
+    RoleRegistry public immutable roleRegistry;
     
     mapping(uint256 => VerificationRequest) public verificationRequests;
     mapping(address => uint256[]) public userRequests;
@@ -29,13 +32,18 @@ contract Over18Verifier {
     event VerificationRequested(uint256 indexed requestId, address indexed requester, address indexed user, uint256 fee);
     event VerificationCompleted(uint256 indexed requestId, address indexed user, bool result);
     event VerificationRejected(uint256 indexed requestId, address indexed user);
+    event VerificationFeeUpdated(uint256 newFee);
+    event FeesWithdrawn(address indexed to, uint256 amount);
     
-    constructor(address _attesterContract, address _groth16Verifier) {
+    constructor(address _attesterContract, address _groth16Verifier, address _roleRegistry) Ownable() {
         attesterContract = AttesterContract(_attesterContract);
         groth16Verifier = Groth16Verifier(_groth16Verifier);
+        roleRegistry = RoleRegistry(_roleRegistry);
     }
     
     function requestVerification(address user) external payable returns (uint256) {
+        require(roleRegistry.isVerifier(msg.sender), "verifiers only");
+        require(roleRegistry.isUser(user), "target must be user");
         require(msg.value >= verificationFee, "Insufficient fee");
         require(attesterContract.hasValidCard(user), "User has no valid Aadhaar card");
         
@@ -67,6 +75,7 @@ contract Over18Verifier {
     ) external {
         VerificationRequest storage request = verificationRequests[requestId];
         
+        require(roleRegistry.isUser(msg.sender), "users only");
         require(request.user == msg.sender, "Only user can complete");
         require(!request.isCompleted, "Already completed");
         require(block.timestamp <= request.requestTimestamp + 1 days, "Expired");
@@ -74,12 +83,10 @@ contract Over18Verifier {
         uint256 nullifierHash = publicSignals[1];
         require(!usedNullifiers[nullifierHash], "Proof has already been used");
         
-        // Call the new, correct function and ignore the last return value
-        (uint256 userAadhaarHash, uint256 userSecretHash, ) = attesterContract.getPublicCommitments(msg.sender);
+        (uint256 userAadhaarHash, uint256 userSecretHash, , ) = attesterContract.getPublicCommitments(msg.sender);
         
         require(!attesterContract.isSecretHashRevoked(userSecretHash), "Credential has been revoked");
 
-        // Public signals order: [isOver18, nullifierHash, currentYear, currentMonth, currentDay, aadhaarHash, secretHash, requestIdentifier, verifierIdentifier]
         require(publicSignals[5] == userAadhaarHash, "Aadhaar hash mismatch");
         require(publicSignals[6] == userSecretHash, "Secret hash mismatch");
         require(publicSignals[7] == requestId, "Request ID mismatch");
@@ -94,10 +101,7 @@ contract Over18Verifier {
         
         emit VerificationCompleted(requestId, msg.sender, request.result);
         
-        uint256 userReward = request.fee / 10;
-        if (userReward > 0) {
-            payable(msg.sender).transfer(userReward);
-        }
+        // User reward logic has been removed.
     }
     
     function rejectVerification(uint256 requestId) external {
@@ -111,7 +115,8 @@ contract Over18Verifier {
         
         emit VerificationRejected(requestId, msg.sender);
         
-        payable(request.requester).transfer(request.fee);
+        (bool sent, ) = request.requester.call{value: request.fee}("");
+        require(sent, "Failed to refund requester");
     }
     
     function getVerificationResult(uint256 requestId) 
@@ -149,11 +154,18 @@ contract Over18Verifier {
         return pendingRequests;
     }
     
-    function setVerificationFee(uint256 newFee) external {
+    function setVerificationFee(uint256 newFee) external onlyOwner {
         verificationFee = newFee;
+        emit VerificationFeeUpdated(newFee);
     }
     
-    function withdrawFees() external {
-        payable(msg.sender).transfer(address(this).balance);
+    function withdrawFees() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No fees to withdraw");
+        
+        (bool sent, ) = owner().call{value: balance}("");
+        require(sent, "Failed to withdraw fees");
+        
+        emit FeesWithdrawn(owner(), balance);
     }
 }

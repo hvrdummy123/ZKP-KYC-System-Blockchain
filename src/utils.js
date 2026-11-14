@@ -2,6 +2,36 @@ const { ethers } = require("hardhat");
 
 class Utils {
     /**
+     * Deploy the core Over18 stack for Hardhat tests.
+     * @returns {Promise<{attesterContract: any, over18Verifier: any, groth16Verifier: any}>}
+     */
+    static async deployContracts() {
+        const [deployer] = await ethers.getSigners();
+
+        const AttesterContract = await ethers.getContractFactory("AttesterContract");
+        const attesterContract = await AttesterContract.deploy();
+        await attesterContract.waitForDeployment();
+
+        const RoleRegistry = await ethers.getContractFactory("RoleRegistry");
+        const roleRegistry = await RoleRegistry.deploy(deployer.address);
+        await roleRegistry.waitForDeployment();
+
+        const Groth16Verifier = await ethers.getContractFactory("Groth16Verifier");
+        const groth16Verifier = await Groth16Verifier.deploy();
+        await groth16Verifier.waitForDeployment();
+
+        const Over18Verifier = await ethers.getContractFactory("Over18Verifier");
+        const over18Verifier = await Over18Verifier.deploy(
+            await attesterContract.getAddress(),
+            await groth16Verifier.getAddress(),
+            await roleRegistry.getAddress()
+        );
+        await over18Verifier.waitForDeployment();
+
+        return { attesterContract, over18Verifier, groth16Verifier, roleRegistry };
+    }
+
+    /**
      * Get contract instances from deployment addresses.
      * This function is designed to be flexible and will attach to whichever
      * contract addresses are provided in the deployments object.
@@ -22,6 +52,10 @@ class Utils {
         if (deployments.stateOfResidenceVerifier) {
             const StateOfResidenceVerifier = await ethers.getContractFactory("StateOfResidenceVerifier");
             contracts.stateOfResidenceVerifier = StateOfResidenceVerifier.attach(deployments.stateOfResidenceVerifier);
+        }
+        if (deployments.genderVerifier) {
+            const GenderVerifier = await ethers.getContractFactory("GenderVerifier");
+            contracts.genderVerifier = GenderVerifier.attach(deployments.genderVerifier);
         }
         
         return contracts;

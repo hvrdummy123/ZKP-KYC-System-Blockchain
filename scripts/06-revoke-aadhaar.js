@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 async function revokeAadhaar() {
-    console.log("🏛️  Aadhaar Organization: Revoking an Aadhaar Card\n");
+    console.log("Aadhaar Organization: Revoking an Aadhaar Card\n");
 
     try {
         const deployments = JSON.parse(fs.readFileSync(path.join(__dirname, '../deployments.json'), 'utf-8'));
@@ -25,7 +25,7 @@ async function revokeAadhaar() {
         // Perform the revocation
         const tx = await attesterContract.connect(aadhaarOrg).revokeAadhaarCard(userToRevoke.address);
         await Utils.waitForTransaction(tx, "Bob's Aadhaar revocation");
-        console.log("✅ Revocation transaction confirmed.");
+        console.log(" Revocation transaction confirmed.");
 
         // Check status after revocation
         let isRevokedAfter = await attesterContract.isSecretHashRevoked(userToRevoke.secretHash);
@@ -35,11 +35,11 @@ async function revokeAadhaar() {
         if (isRevokedAfter && !hasValidCardAfter) {
             console.log("\n🎉 Successfully revoked Bob's Aadhaar card. His secret hash is now on the revocation list.");
         } else {
-            console.error("\n❌ Revocation failed. Status did not update correctly.");
+            console.error("\nRevocation failed. Status did not update correctly.");
         }
 
     } catch (error) {
-        console.error("❌ Error during revocation:", error);
+        console.error("Error during revocation:", error);
         process.exit(1);
     }
 }

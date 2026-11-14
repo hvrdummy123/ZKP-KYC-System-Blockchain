@@ -2,26 +2,44 @@
   "alice": {
     "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
     "name": "Alice",
-    "aadhaarNumber": "790712838171",
-    "birthYear": 2004,
-    "birthMonth": 4,
-    "birthDay": 27,
+    "aadhaarNumber": "452982268411",
+    "birthYear": 1982,
+    "birthMonth": 12,
+    "birthDay": 24,
     "userState": 27,
-    "stateSalt": 496564722,
-    "salt": "821918291",
-    "secret": "271519731981615351688995937187846550365703138950840198269025953287389962464"
+    "stateSalt": 684663838,
+    "userGender": 2,
+    "genderSalt": 902534671,
+    "salt": "152206114",
+    "secret": "407861201106718357036865559441403471661681232229766644697937786241948976558"
   },
   "bob": {
     "address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
     "name": "Bob",
-    "aadhaarNumber": "792614646820",
-    "birthYear": 2009,
+    "aadhaarNumber": "578172023304",
+    "birthYear": 2013,
     "birthMonth": 7,
-    "birthDay": 11,
+    "birthDay": 24,
     "userState": 29,
-    "stateSalt": 350487914,
-    "salt": "932033162",
-    "secret": "236160399996325128988240066926393763168382582943264857115170498747857944946"
+    "stateSalt": 737867710,
+    "userGender": 1,
+    "genderSalt": 73362407,
+    "salt": "491306761",
+    "secret": "85929014953671762672580026315379105877205889655589692473405585714361489601"
+  },
+  "charlie": {
+    "address": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+    "name": "Charlie",
+    "aadhaarNumber": "406901597726",
+    "birthYear": 2003,
+    "birthMonth": 12,
+    "birthDay": 3,
+    "userState": 7,
+    "stateSalt": 28349146,
+    "userGender": 3,
+    "genderSalt": 706652123,
+    "salt": "469955658",
+    "secret": "77508186718778561682609782096235543236741013706640857249414685778264816598"
   },
   "company": {
     "address": "0x90F79bf6EB2c4f870365E785982E1f101E93b906"

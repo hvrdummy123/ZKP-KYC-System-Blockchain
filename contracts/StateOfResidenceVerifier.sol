@@ -3,8 +3,10 @@ pragma solidity ^0.8.19;
 
 import "./StateOfResidenceGroth16Verifier.sol";
 import "./AttesterContract.sol";
+import "./RoleRegistry.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract StateOfResidenceVerifier {
+contract StateOfResidenceVerifier is Ownable {
     struct StateVerificationRequest {
         address requester;
         address user;
@@ -17,6 +19,7 @@ contract StateOfResidenceVerifier {
     
     AttesterContract public immutable attester;
     StateOfResidenceGroth16Verifier public immutable groth16Verifier;
+    RoleRegistry public immutable roleRegistry;
     
     mapping(uint256 => StateVerificationRequest) public stateVerificationRequests;
     mapping(address => uint256[]) public userStateRequests;
@@ -29,13 +32,18 @@ contract StateOfResidenceVerifier {
     event StateVerificationRequested(uint256 indexed requestId, address indexed requester, address indexed user, uint256 requiredState, uint256 fee);
     event StateVerificationCompleted(uint256 indexed requestId, address indexed user, bool result);
     event StateVerificationRejected(uint256 indexed requestId, address indexed user);
-    
-    constructor(address _attester, address _groth16Verifier) {
+    event StateVerificationFeeUpdated(uint256 newFee);
+    event StateFeesWithdrawn(address indexed to, uint256 amount);
+
+    constructor(address _attester, address _groth16Verifier, address _roleRegistry) Ownable() {
         attester = AttesterContract(_attester);
         groth16Verifier = StateOfResidenceGroth16Verifier(_groth16Verifier);
+        roleRegistry = RoleRegistry(_roleRegistry);
     }
 
-    function requestStateVerification(address user, uint256 state) public payable {
+    function requestStateVerification(address user, uint256 state) public payable returns (uint256) {
+        require(roleRegistry.isVerifier(msg.sender), "verifiers only");
+        require(roleRegistry.isUser(user), "target must be user");
         require(msg.value >= stateVerificationFee, "Insufficient fee");
         require(attester.hasValidCard(user), "User has no valid Aadhaar card");
         
@@ -55,6 +63,7 @@ contract StateOfResidenceVerifier {
         requesterStateRequests[msg.sender].push(requestId);
         
         emit StateVerificationRequested(requestId, msg.sender, user, state, msg.value);
+        return requestId;
     }
     
     function completeStateVerification(
@@ -66,6 +75,7 @@ contract StateOfResidenceVerifier {
     ) external {
         StateVerificationRequest storage request = stateVerificationRequests[requestId];
         
+        require(roleRegistry.isUser(msg.sender), "users only");
         require(request.user == msg.sender, "Only user can complete");
         require(!request.isCompleted, "Already completed");
         require(block.timestamp <= request.requestTimestamp + 1 days, "Expired");
@@ -73,32 +83,25 @@ contract StateOfResidenceVerifier {
         uint256 nullifierHash = publicSignals[1];
         require(!usedStateNullifiers[nullifierHash], "Proof has already been used");
         
-        // Get user's commitments and check for revocation
-        (, uint256 userSecretHash, uint256 userStateCommitment) = attester.getPublicCommitments(msg.sender);
+        (, uint256 userSecretHash, uint256 userStateCommitment, ) = attester.getPublicCommitments(msg.sender);
         require(!attester.isSecretHashRevoked(userSecretHash), "Credential has been revoked");
         
-        // Public signals order: [matchesState, nullifierHash, requiredState, requestIdentifier, verifierIdentifier, stateCommitment, secretHash]
         require(publicSignals[2] == request.requiredState, "Required state mismatch");
         require(publicSignals[3] == requestId, "Request ID mismatch");
         require(publicSignals[4] == uint256(uint160(request.requester)), "Verifier ID mismatch");
         require(publicSignals[5] == userStateCommitment, "State commitment mismatch");
         require(publicSignals[6] == userSecretHash, "Secret hash mismatch");
         
-        // Verify the ZK proof
         bool proofValid = groth16Verifier.verifyProof(pA, pB, pC, publicSignals);
         require(proofValid, "Invalid ZK proof");
         
         usedStateNullifiers[nullifierHash] = true;
         request.isCompleted = true;
-        request.result = (publicSignals[0] == 1); // matchesState from circuit
+        request.result = (publicSignals[0] == 1);
         
         emit StateVerificationCompleted(requestId, msg.sender, request.result);
         
-        // Reward user with 10% of the fee
-        uint256 userReward = request.fee / 10;
-        if (userReward > 0) {
-            payable(msg.sender).transfer(userReward);
-        }
+        // User reward logic has been removed.
     }
     
     function rejectStateVerification(uint256 requestId) external {
@@ -112,8 +115,8 @@ contract StateOfResidenceVerifier {
         
         emit StateVerificationRejected(requestId, msg.sender);
         
-        // Refund requester
-        payable(request.requester).transfer(request.fee);
+        (bool sent, ) = request.requester.call{value: request.fee}("");
+        require(sent, "Failed to refund requester");
     }
     
     function getStateVerificationResult(uint256 requestId) 
@@ -151,11 +154,18 @@ contract StateOfResidenceVerifier {
         return pendingRequests;
     }
     
-    function setStateVerificationFee(uint256 newFee) external {
+    function setStateVerificationFee(uint256 newFee) external onlyOwner {
         stateVerificationFee = newFee;
+        emit StateVerificationFeeUpdated(newFee);
     }
     
-    function withdrawStateFees() external {
-        payable(msg.sender).transfer(address(this).balance);
+    function withdrawStateFees() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No fees to withdraw");
+
+        (bool sent, ) = owner().call{value: balance}("");
+        require(sent, "Failed to withdraw fees");
+
+        emit StateFeesWithdrawn(owner(), balance);
     }
 }

@@ -2,6 +2,12 @@
 
 This repository demonstrates a minimal zero-knowledge KYC-style flow that verifies a user's "state of residence" using a Circom circuit, snarkJS (Groth16), and a Solidity verifier + coordination contract deployed with Hardhat.
 
+**Roles:** one fixed Attester at deploy; others sign up once as User or Verifier ([RoleRegistry](contracts/RoleRegistry.sol)).  
+**Visitors:** `/try` sandbox needs no role — [docs/TRY_IT.md](docs/TRY_IT.md).  
+**Accounts:** [docs/HARDHAT_ACCOUNTS.md](docs/HARDHAT_ACCOUNTS.md). **Threats / leaks:** [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
+
+![How ZKP-KYC works](docs/demo.gif)
+
 This README explains how to:
 - Install dependencies
 - Build circuits and generate keys / proofs

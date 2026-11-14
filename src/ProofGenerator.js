@@ -14,6 +14,10 @@ class ProofGenerator {
         this.stateWasmPath = path.join(__dirname, "../circuits/build/StateOfResidence_js/StateOfResidence.wasm");
         this.stateZkeyPath = path.join(__dirname, "../circuits/build/StateOfResidence_final.zkey");
 
+        // GenderVerification paths
+        this.genderWasmPath = path.join(__dirname, "../circuits/build/GenderVerification_js/GenderVerification.wasm");
+        this.genderZkeyPath = path.join(__dirname, "../circuits/build/GenderVerification_final.zkey");
+
         this.poseidon = null;
     }
 
@@ -32,6 +36,18 @@ class ProofGenerator {
     generateStateCommitment(userState, stateSalt) {
         if (!this.poseidon) throw new Error("Poseidon not initialized");
         const inputs = [ BigInt(userState), BigInt(stateSalt) ];
+        return this.poseidon.F.toObject(this.poseidon(inputs));
+    }
+
+    generateStateCommitment(userState, stateSalt) {
+        if (!this.poseidon) throw new Error("Poseidon not initialized");
+        const inputs = [ BigInt(userState), BigInt(stateSalt) ];
+        return this.poseidon.F.toObject(this.poseidon(inputs));
+    }
+
+    generateGenderCommitment(userGender, genderSalt) {
+        if (!this.poseidon) throw new Error("Poseidon not initialized");
+        const inputs = [ BigInt(userGender), BigInt(genderSalt) ];
         return this.poseidon.F.toObject(this.poseidon(inputs));
     }
 
@@ -86,22 +102,24 @@ class ProofGenerator {
 
     async generateStateProof(stateData, secret, requestIdentifier, verifierIdentifier, requiredState) {
         try {
+            if (!this.poseidon) await this.init();
+            
             const { userState, stateSalt } = stateData;
             const stateCommitment = this.generateStateCommitment(userState, stateSalt);
             const secretHash = this.generateSecretHash(secret);
 
             const circuitInput = {
-                // Private
+                // Private inputs
                 userState: BigInt(userState),
                 stateSalt: BigInt(stateSalt),
                 secret: BigInt(secret),
-                // Public
+                // Public inputs
                 requiredState: BigInt(requiredState),
                 requestIdentifier: BigInt(requestIdentifier),
                 verifierIdentifier: BigInt(verifierIdentifier),
                 stateCommitment: BigInt(stateCommitment),
                 secretHash: BigInt(secretHash)
-            };
+            };      
 
             const tmpDir = path.join(__dirname, "../tmp");
             if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir);
@@ -112,6 +130,43 @@ class ProofGenerator {
             return { proof, publicSignals, success: true };
         } catch (error) {
             console.error("Error generating State proof:", error);
+            return { error: error.message, success: false };
+        }
+    }
+
+    async generateGenderProof(genderData, secret, requestIdentifier, verifierIdentifier, requiredGender) {
+        try {
+            if (!this.poseidon) await this.init();
+            
+            const { userGender, genderSalt } = genderData;
+            const genderCommitment = this.generateGenderCommitment(userGender, genderSalt);
+            const secretHash = this.generateSecretHash(secret);
+
+            // Generate nullifier from secret, requestId, and verifierId
+            const nullifier = this.poseidon.F.toObject(this.poseidon([BigInt(secret), BigInt(requestIdentifier), BigInt(verifierIdentifier)]));
+
+            const circuitInput = {
+                // Private inputs
+                userGender: BigInt(userGender),
+                genderSalt: BigInt(genderSalt),
+                secret: BigInt(secret),
+                // Public inputs
+                requiredGender: BigInt(requiredGender),
+                requestIdentifier: BigInt(requestIdentifier),
+                verifierIdentifier: BigInt(verifierIdentifier),
+                genderCommitment: BigInt(genderCommitment),
+                secretHash: BigInt(secretHash)
+            };
+
+            const tmpDir = path.join(__dirname, "../tmp");
+            if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir);
+            const witnessPath = path.join(tmpDir, `witness_gender_${requestIdentifier}.wtns`);
+
+            await snarkjs.wtns.calculate(circuitInput, this.genderWasmPath, witnessPath);
+            const { proof, publicSignals } = await snarkjs.groth16.prove(this.genderZkeyPath, witnessPath);
+            return { proof, publicSignals, success: true };
+        } catch (error) {
+            console.error("Error generating Gender proof:", error);
             return { error: error.message, success: false };
         }
     }

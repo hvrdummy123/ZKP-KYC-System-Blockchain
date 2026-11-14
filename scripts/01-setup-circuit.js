@@ -29,7 +29,7 @@ async function setupCircuit() {
         const ptauPath = path.join(buildDir, 'powersOfTau28_hez_final_12.ptau');
         
         if (!fs.existsSync(ptauPath)) {
-            console.log('📥 Downloading powers of tau file (phase 1)...');
+            console.log('Downloading powers of tau file (phase 1)...');
             
             // Use the new, reliable URL
             const ptauURL = "https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_12.ptau";
@@ -37,9 +37,9 @@ async function setupCircuit() {
             // Use curl with -L to follow redirects
             await execAsync(`curl -L -o ${ptauPath} ${ptauURL}`);
             
-            console.log('✅ Powers of tau downloaded');
+            console.log('Powers of tau downloaded');
         } else {
-            console.log('✅ Powers of tau file already exists. Skipping download.');
+            console.log('Powers of tau file already exists. Skipping download.');
         }
 
         // Setup ceremony
@@ -52,27 +52,27 @@ async function setupCircuit() {
 
         // Phase 1
         await execAsync(`snarkjs groth16 setup ${r1csPath} ${ptauPath} ${zkeyPath0}`);
-        console.log('✅ Phase 1 setup completed');
+        console.log('Phase 1 setup completed');
 
         // Phase 2 (contribution)
         await execAsync(`echo "random entropy text" | snarkjs zkey contribute ${zkeyPath0} ${zkeyPath1} --name="First contribution" -v`);
-        console.log('✅ Phase 2 contribution completed');
+        console.log('Phase 2 contribution completed');
 
         // Finalize
         await execAsync(`snarkjs zkey beacon ${zkeyPath1} ${zkeyFinal} 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 10 -n="Final Beacon"`);
-        console.log('✅ Final setup completed');
+        console.log('Final setup completed');
 
         // Export verification key
         await execAsync(`snarkjs zkey export verificationkey ${zkeyFinal} ${vkeyPath}`);
-        console.log('✅ Verification key exported');
+        console.log('Verification key exported');
 
         // Generate Solidity verifier
         const verifierPath = path.join(__dirname, '../contracts/Groth16Verifier.sol');
         await execAsync(`snarkjs zkey export solidityverifier ${zkeyFinal} ${verifierPath}`);
-        console.log('✅ Solidity verifier generated');
+        console.log('Solidity verifier generated');
 
-        console.log('\n🎉 Circuit setup completed successfully!');
-        console.log('📁 Generated files:');
+        console.log('\nCircuit setup completed successfully!');
+        console.log('Generated files:');
         console.log(`   - R1CS: ${r1csPath}`);
         console.log(`   - WASM: ${wasmPath}`);
         console.log(`   - Final zKey: ${zkeyFinal}`);
@@ -80,7 +80,7 @@ async function setupCircuit() {
         console.log(`   - Solidity Verifier: ${verifierPath}`);
 
     } catch (error) {
-        console.error('❌ Error during setup:', error);
+        console.error('Error during setup:', error);
         process.exit(1);
     }
 }
